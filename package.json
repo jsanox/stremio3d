@@ -1,7 +1,9 @@
 {
-  "name": "stremio-3d-filter-addon",
-  "version": "1.0.0",
+  "name": "stremio-3d-filter-addon-v2",
+  "version": "2.0.0",
   "private": true,
-  "description": "A Stremio proxy addon that keeps only 3D/SBS/OU/MVC streams from an upstream addon.",
-  "engines": {"node": ">=20"}
+  "description": "Stremio addon that filters an upstream addon to 3D/SBS/OU/MVC streams.",
+  "engines": {
+    "node": ">=20"
+  }
 }
