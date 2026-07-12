@@ -1,8 +1,8 @@
 {
-  "name": "stremio-3d-filter-addon-v3",
-  "version": "3.0.0",
+  "name": "stremio-3d-filter-addon-v4",
+  "version": "4.0.0",
   "private": true,
-  "description": "Stremio addon that filters an upstream addon to 3D/SBS/OU/MVC streams.",
+  "description": "Configurable Stremio 3D stream filter and sorter.",
   "engines": {
     "node": ">=20"
   }
