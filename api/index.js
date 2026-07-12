@@ -5,20 +5,18 @@ const DEFAULT_TAGS = [
   "top and bottom", "tab", "mvc", "frame packed", "frame-packed"
 ];
 
-const manifestBase = {
-  id: "com.jonathan.stremio3dfilter",
-  version: "2.0.0",
-  name: "3D Only Filter",
-  description: "Filters streams from your existing addon and keeps only 3D/SBS/OU/MVC releases.",
-  resources: ["stream"],
-  types: ["movie"],
-  idPrefixes: ["tt"],
-  catalogs: [],
-  behaviorHints: {
-    configurable: true,
-    configurationRequired: true
-  }
-};
+function manifestForConfiguredAddon() {
+  return {
+    id: "com.jonathan.stremio3dfilter",
+    version: "3.0.0",
+    name: "3D Only Filter",
+    description: "Filters streams from your existing addon and keeps only 3D/SBS/OU/MVC releases.",
+    resources: ["stream"],
+    types: ["movie"],
+    idPrefixes: ["tt"],
+    catalogs: []
+  };
+}
 
 function sendJson(res, status, body) {
   res.statusCode = status;
@@ -101,8 +99,12 @@ function is3D(stream, config) {
   return config.tags.some(tag => hasToken(text, tag));
 }
 
-function configurePage(origin) {
-  const tags = DEFAULT_TAGS.join(", ");
+function configurePage(origin, existingToken = "") {
+  let prefill = { upstream: "", tags: DEFAULT_TAGS, maxResults: 30, strict: true };
+  if (existingToken) {
+    try { prefill = decodeConfig(existingToken); } catch {}
+  }
+  const esc = (s) => String(s).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;");
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -128,20 +130,20 @@ code{display:block;word-break:break-all;background:#111520;padding:12px;border-r
 <div class="card">
 <h1>🥽 3D Only Filter</h1>
 <p>This filters your existing AIOStreams results to releases labeled 3D, SBS, HSBS, OU/TAB, MVC, or frame-packed.</p>
-<div class="notice"><strong>Important:</strong> It can only filter streams that AIOStreams already returns. It cannot force AIOStreams to discover a missing 3D release.</div>
+<div class="notice"><strong>Important:</strong> It can only filter streams that AIOStreams already returns.</div>
 <form id="configForm">
 <label for="upstream">AIOStreams manifest or addon URL</label>
-<input id="upstream" type="url" placeholder="https://.../manifest.json" required>
-<div class="small">Paste your personalized AIOStreams manifest URL. Keep it private.</div>
+<input id="upstream" type="url" value="${esc(prefill.upstream)}" placeholder="https://.../manifest.json" required>
+<div class="small">Keep this URL private.</div>
 
 <label for="tags">3D labels</label>
-<textarea id="tags" rows="4">${tags}</textarea>
+<textarea id="tags" rows="4">${esc(prefill.tags.join(", "))}</textarea>
 
 <label for="maxResults">Maximum 3D results</label>
-<input id="maxResults" type="number" min="1" max="100" value="30">
+<input id="maxResults" type="number" min="1" max="100" value="${prefill.maxResults}">
 
 <label style="display:flex;gap:10px;align-items:center">
-<input id="strict" type="checkbox" checked style="width:auto">
+<input id="strict" type="checkbox" ${prefill.strict ? "checked" : ""} style="width:auto">
 Hide releases explicitly marked 2D
 </label>
 
@@ -224,10 +226,15 @@ module.exports = async function handler(req, res) {
       return sendHtml(res, 200, configurePage(origin));
     }
 
+    const configureMatch = path.match(/^\/([^/]+)\/configure\/?$/);
+    if (configureMatch) {
+      return sendHtml(res, 200, configurePage(origin, configureMatch[1]));
+    }
+
     const manifestMatch = path.match(/^\/([^/]+)\/manifest\.json$/);
     if (manifestMatch) {
       decodeConfig(manifestMatch[1]);
-      return sendJson(res, 200, manifestBase);
+      return sendJson(res, 200, manifestForConfiguredAddon());
     }
 
     const streamMatch = path.match(/^\/([^/]+)\/stream\/([^/]+)\/(.+)\.json$/);
@@ -245,27 +252,21 @@ module.exports = async function handler(req, res) {
       let response;
       try {
         response = await fetch(upstreamUrl, {
-          headers: {"User-Agent": "Stremio-3D-Filter/2.0"},
+          headers: {"User-Agent": "Stremio-3D-Filter/3.0"},
           signal: controller.signal
         });
       } finally {
         clearTimeout(timeout);
       }
 
-      if (!response.ok) {
-        return sendJson(res, 200, { streams: [] });
-      }
+      if (!response.ok) return sendJson(res, 200, { streams: [] });
 
       const payload = await response.json();
       const streams = Array.isArray(payload.streams) ? payload.streams : [];
-
       const filtered = streams
         .filter(stream => is3D(stream, config))
         .slice(0, config.maxResults)
-        .map(stream => ({
-          ...stream,
-          name: `🥽 3D | ${stream.name || "Stream"}`
-        }));
+        .map(stream => ({...stream, name: `🥽 3D | ${stream.name || "Stream"}`}));
 
       return sendJson(res, 200, { streams: filtered });
     }
